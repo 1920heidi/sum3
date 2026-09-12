@@ -35,6 +35,7 @@ class Note(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(120), nullable=False)
     content = db.Column(db.Text, nullable=False)
+    category = db.Column(db.String(50), nullable=False, default="Notes")
     created_at = db.Column(db.DateTime, server_default=db.func.now())
     updated_at = db.Column(
         db.DateTime,
@@ -49,6 +50,7 @@ class Note(db.Model):
             "id": self.id,
             "title": self.title,
             "content": self.content,
+            "category": self.category or "Notes",
             "user_id": self.user_id,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,

@@ -4,14 +4,6 @@ import { Button, Input, FormField, Label, Textarea } from "../styles";
 
 const categories = ["Notes", "Tasks", "Workouts", "Journal"];
 
-function parseNoteTitle(rawTitle) {
-  const match = rawTitle.match(/^\[([^\]]+)\]\s*(.*)$/);
-  if (!match) {
-    return { category: "Notes", title: rawTitle };
-  }
-  return { category: match[1], title: match[2] || "Untitled" };
-}
-
 function NotesPage({ user }) {
   const [notes, setNotes] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState("Notes");
@@ -25,9 +17,9 @@ function NotesPage({ user }) {
 
   const token = localStorage.getItem("token");
 
-  function fetchNotes(nextPage = 1) {
+  function fetchNotes(nextPage = 1, category = selectedCategory) {
     setLoading(true);
-    fetch(`/notes?page=${nextPage}&per_page=3`, {
+    fetch(`/notes?page=${nextPage}&per_page=3&category=${encodeURIComponent(category)}`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -49,8 +41,8 @@ function NotesPage({ user }) {
   }
 
   useEffect(() => {
-    fetchNotes(1);
-  }, []);
+    fetchNotes(1, selectedCategory);
+  }, [selectedCategory]);
 
   function resetForm() {
     setSelectedId(null);
@@ -59,10 +51,9 @@ function NotesPage({ user }) {
   }
 
   function handleEdit(note) {
-    const parsed = parseNoteTitle(note.title);
     setSelectedId(note.id);
-    setSelectedCategory(parsed.category);
-    setTitle(parsed.title);
+    setSelectedCategory(note.category || "Notes");
+    setTitle(note.title);
     setContent(note.content);
   }
 
@@ -76,8 +67,9 @@ function NotesPage({ user }) {
     }
 
     const payload = {
-      title: `[${selectedCategory}] ${title.trim()}`,
+      title: title.trim(),
       content: content.trim(),
+      category: selectedCategory,
     };
 
     const request = selectedId
@@ -105,7 +97,7 @@ function NotesPage({ user }) {
       })
       .then(() => {
         resetForm();
-        fetchNotes(page);
+        fetchNotes(page, selectedCategory);
       })
       .catch(() => {
         setError("Could not save this note.");
@@ -127,15 +119,11 @@ function NotesPage({ user }) {
       })
       .then(() => {
         resetForm();
-        fetchNotes(page);
+        fetchNotes(page, selectedCategory);
       })
       .catch(() => {
         setError("Could not delete this note.");
       });
-  }
-
-  function filteredNotes() {
-    return notes.filter((note) => parseNoteTitle(note.title).category === selectedCategory);
   }
 
   return (
@@ -143,7 +131,7 @@ function NotesPage({ user }) {
       <Header>
         <div>
           <Eyebrow>Welcome, {user?.username}</Eyebrow>
-          <Title>My Notes</Title>
+          <Title>My Productivity Board</Title>
         </div>
       </Header>
 
@@ -205,39 +193,36 @@ function NotesPage({ user }) {
         <Panel>
           <PanelTitle>{selectedCategory}</PanelTitle>
           {loading ? <Muted>Loading entries...</Muted> : null}
-          {!loading && filteredNotes().length === 0 ? (
+          {!loading && notes.length === 0 ? (
             <Muted>No entries in this category yet.</Muted>
           ) : null}
           {!loading &&
-            filteredNotes().map((note) => {
-              const parsed = parseNoteTitle(note.title);
-              return (
-                <NoteCard key={note.id}>
-                  <NoteMeta>
-                    <strong>{parsed.title}</strong>
-                    <span>{parsed.category}</span>
-                  </NoteMeta>
-                  <NoteContent>{note.content}</NoteContent>
-                  <NoteActions>
-                    <Button variant="outline" type="button" onClick={() => handleEdit(note)}>
-                      Edit
-                    </Button>
-                    <Button type="button" onClick={() => handleDelete(note.id)}>
-                      Delete
-                    </Button>
-                  </NoteActions>
-                </NoteCard>
-              );
-            })}
+            notes.map((note) => (
+              <NoteCard key={note.id}>
+                <NoteMeta>
+                  <strong>{note.title}</strong>
+                  <span>{note.category || "Notes"}</span>
+                </NoteMeta>
+                <NoteContent>{note.content}</NoteContent>
+                <NoteActions>
+                  <Button variant="outline" type="button" onClick={() => handleEdit(note)}>
+                    Edit
+                  </Button>
+                  <Button type="button" onClick={() => handleDelete(note.id)}>
+                    Delete
+                  </Button>
+                </NoteActions>
+              </NoteCard>
+            ))}
 
           <Pagination>
-            <Button type="button" variant="outline" disabled={page <= 1} onClick={() => fetchNotes(page - 1)}>
+            <Button type="button" variant="outline" disabled={page <= 1} onClick={() => fetchNotes(page - 1, selectedCategory)}>
               Previous
             </Button>
             <PageLabel>
               Page {page} / {lastPage}
             </PageLabel>
-            <Button type="button" variant="outline" disabled={page >= lastPage} onClick={() => fetchNotes(page + 1)}>
+            <Button type="button" variant="outline" disabled={page >= lastPage} onClick={() => fetchNotes(page + 1, selectedCategory)}>
               Next
             </Button>
           </Pagination>
@@ -254,7 +239,13 @@ const Page = styled.div`
 `;
 
 const Header = styled.header`
-  margin-bottom: 16px;
+  margin: 18px 0 16px;
+  padding: 18px 20px 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  box-shadow: 0 10px 20px rgba(82, 28, 90, 0.08);
+  backdrop-filter: blur(10px);
 `;
 
 const Eyebrow = styled.p`
@@ -262,29 +253,33 @@ const Eyebrow = styled.p`
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-size: 12px;
-  color: #666;
+  color: #4d2458;
+  font-weight: 700;
 `;
 
 const Title = styled.h2`
   margin: 0;
-  font-size: 2rem;
+  font-size: clamp(2rem, 3vw, 3rem);
+  color: #3b194a;
+  line-height: 1.1;
 `;
 
 const CategoryBar = styled.div`
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px;
   margin: 16px 0 24px;
 `;
 
 const CategoryButton = styled.button`
-  border: 1px solid #d0d7de;
-  background: ${(props) => (props.active ? "#ff5ca8" : "#fff")};
-  color: ${(props) => (props.active ? "#fff" : "#222")};
-  padding: 8px 14px;
+  border: 1px solid rgba(255, 79, 163, 0.25);
+  background: ${(props) => (props.active ? "linear-gradient(135deg, #ff4fa3 0%, #ff8ac4 100%)" : "rgba(255,255,255,0.7)")};
+  color: ${(props) => (props.active ? "#fff" : "#5b1a3a")};
+  padding: 9px 16px;
   border-radius: 999px;
   cursor: pointer;
-  font-weight: 600;
+  font-weight: 700;
+  box-shadow: ${(props) => (props.active ? "0 10px 22px rgba(255,79,163,0.25)" : "none")};
 `;
 
 const Grid = styled.div`
@@ -298,16 +293,17 @@ const Grid = styled.div`
 `;
 
 const Panel = styled.section`
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 18px;
   padding: 18px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 14px 28px rgba(122, 40, 92, 0.08);
 `;
 
 const PanelTitle = styled.h3`
   margin: 0 0 16px;
-  font-size: 1.2rem;
+  font-size: 1.3rem;
+  color: #5b1a3a;
 `;
 
 const ActionRow = styled.div`
@@ -322,16 +318,16 @@ const ErrorText = styled.p`
 `;
 
 const Muted = styled.p`
-  color: #666;
+  color: #7a4861;
   margin: 0;
 `;
 
 const NoteCard = styled.article`
-  border: 1px solid #ececec;
-  border-radius: 10px;
+  border: 1px solid rgba(255, 79, 163, 0.18);
+  border-radius: 14px;
   padding: 14px;
   margin-bottom: 12px;
-  background: #f9fafb;
+  background: rgba(255, 245, 250, 0.9);
 `;
 
 const NoteMeta = styled.div`
@@ -340,12 +336,14 @@ const NoteMeta = styled.div`
   gap: 8px;
   margin-bottom: 8px;
   align-items: center;
+  color: #5b1a3a;
 `;
 
 const NoteContent = styled.p`
   margin: 0 0 12px;
   white-space: pre-wrap;
-  line-height: 1.5;
+  line-height: 1.6;
+  color: #4a2a39;
 `;
 
 const NoteActions = styled.div`
@@ -363,17 +361,18 @@ const Pagination = styled.div`
 `;
 
 const PageLabel = styled.span`
-  font-weight: 600;
-  color: #444;
+  font-weight: 700;
+  color: #5b1a3a;
 `;
 
 const Select = styled.select`
   display: block;
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid #d0d7de;
-  border-radius: 8px;
+  border: 1px solid rgba(255, 79, 163, 0.2);
+  border-radius: 10px;
   font-size: 1rem;
+  background: rgba(255, 255, 255, 0.85);
 `;
 
 export default NotesPage;

@@ -9,6 +9,7 @@ from flask_jwt_extended import (
 )
 from flask_migrate import Migrate
 from flask_restful import Api
+from sqlalchemy import text
 
 from models import Note, User, bcrypt, db
 
@@ -24,9 +25,78 @@ app.config["JSON_SORT_KEYS"] = False
 api = Api(app)
 db.init_app(app)
 
+VALID_CATEGORIES = ["Notes", "Tasks", "Workouts", "Journal"]
+
+
+def normalize_category(value):
+    category = (value or "Notes").strip()
+    return category if category in VALID_CATEGORIES else "Notes"
+
+
+def ensure_note_category_column():
+    with app.app_context():
+        inspector = db.inspect(db.engine)
+        if "notes" not in inspector.get_table_names():
+            db.create_all()
+            return
+
+        columns = [column["name"] for column in inspector.get_columns("notes")]
+        if "category" not in columns:
+            db.session.execute(
+                text("ALTER TABLE notes ADD COLUMN category VARCHAR(50) NOT NULL DEFAULT 'Notes'")
+            )
+            db.session.commit()
+
+
+def seed_demo_data():
+    with app.app_context():
+        if Note.query.first() is not None:
+            return
+
+        demo_user = User.query.filter_by(username="demo").first()
+        if demo_user is None:
+            demo_user = User(username="demo")
+            demo_user.password = "password123"
+            db.session.add(demo_user)
+            db.session.flush()
+
+        if Note.query.filter_by(user_id=demo_user.id).count() == 0:
+            demo_notes = [
+                Note(
+                    title="Morning plan",
+                    content="Review priorities and set the top three goals for the day.",
+                    category="Notes",
+                    user_id=demo_user.id,
+                ),
+                Note(
+                    title="Strength workout",
+                    content="30-minute circuit: squats, lunges, rows, and core work.",
+                    category="Workouts",
+                    user_id=demo_user.id,
+                ),
+                Note(
+                    title="Deep work block",
+                    content="Finish the design pass and clean up the final API wiring before lunch.",
+                    category="Tasks",
+                    user_id=demo_user.id,
+                ),
+                Note(
+                    title="Journal reflection",
+                    content="The improved layout feels calmer and easier to read today.",
+                    category="Journal",
+                    user_id=demo_user.id,
+                ),
+            ]
+            db.session.add_all(demo_notes)
+            db.session.commit()
+
 
 migrate = Migrate(app, db)
 jwt = JWTManager(app)
+with app.app_context():
+    db.create_all()
+    ensure_note_category_column()
+    seed_demo_data()
 
 
 @app.get("/")
@@ -98,16 +168,19 @@ def get_notes():
     user = current_user()
     page = request.args.get("page", default=1, type=int)
     per_page = request.args.get("per_page", default=10, type=int)
+    category_filter = request.args.get("category")
 
     if page < 1:
         page = 1
     if per_page < 1:
         per_page = 10
 
+    query = Note.query.filter_by(user_id=user.id)
+    if category_filter:
+        query = query.filter_by(category=normalize_category(category_filter))
+
     pagination = (
-        Note.query.filter_by(user_id=user.id)
-        .order_by(Note.id.desc())
-        .paginate(page=page, per_page=per_page, error_out=False)
+        query.order_by(Note.id.desc()).paginate(page=page, per_page=per_page, error_out=False)
     )
 
     return jsonify(
@@ -128,11 +201,12 @@ def create_note():
     data = request.get_json(silent=True) or {}
     title = (data.get("title") or "").strip()
     content = (data.get("content") or "").strip()
+    category = normalize_category(data.get("category"))
 
     if not title or not content:
         return jsonify({"errors": ["Title and content are required."]}), 400
 
-    note = Note(title=title, content=content, user_id=user.id)
+    note = Note(title=title, content=content, category=category, user_id=user.id)
     db.session.add(note)
     db.session.commit()
     return jsonify(note.serialize()), 201
@@ -160,6 +234,8 @@ def update_note(note_id):
         if not content:
             return jsonify({"errors": ["Content cannot be empty."]}), 400
         note.content = content
+    if "category" in data:
+        note.category = normalize_category(data.get("category"))
 
     db.session.commit()
     return jsonify(note.serialize())
