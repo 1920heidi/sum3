@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import styled from "styled-components";
 import { Button, Error, Input, FormField, Label } from "../styles";
+import { apiFetch } from "../api";
 
 function LoginForm({ onLogin }) {
   const [username, setUsername] = useState("");
@@ -14,7 +15,7 @@ function LoginForm({ onLogin }) {
     setErrors([]);
     setIsLoading(true);
 
-    fetch("/login", {
+    apiFetch("/login", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

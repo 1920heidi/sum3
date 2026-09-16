@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import styled from "styled-components";
 import { Button, Error, Input, FormField, Label } from "../styles";
+import { apiFetch } from "../api";
 
 function SignUpForm({ onSignupSuccess }) {
   const [username, setUsername] = useState("");
@@ -16,7 +17,7 @@ function SignUpForm({ onSignupSuccess }) {
     setErrors([]);
     setIsLoading(true);
 
-    fetch("/signup", {
+    apiFetch("/signup", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

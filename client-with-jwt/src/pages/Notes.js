@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import styled from "styled-components";
 import { Button, Input, FormField, Label, Textarea } from "../styles";
+import { apiFetch } from "../api";
 
 const categories = ["Notes", "Tasks", "Workouts", "Journal"];
 
@@ -19,7 +20,7 @@ function NotesPage({ user }) {
 
   function fetchNotes(nextPage = 1, category = selectedCategory) {
     setLoading(true);
-    fetch(`/notes?page=${nextPage}&per_page=3&category=${encodeURIComponent(category)}`, {
+    apiFetch(`/notes?page=${nextPage}&per_page=3&category=${encodeURIComponent(category)}`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -42,6 +43,7 @@ function NotesPage({ user }) {
 
   useEffect(() => {
     fetchNotes(1, selectedCategory);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCategory]);
 
   function resetForm() {
@@ -73,7 +75,7 @@ function NotesPage({ user }) {
     };
 
     const request = selectedId
-      ? fetch(`/notes/${selectedId}`, {
+      ? apiFetch(`/notes/${selectedId}`, {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
@@ -81,7 +83,7 @@ function NotesPage({ user }) {
           },
           body: JSON.stringify(payload),
         })
-      : fetch("/notes", {
+      : apiFetch("/notes", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -107,7 +109,7 @@ function NotesPage({ user }) {
   function handleDelete(id) {
     if (!window.confirm("Delete this entry?")) return;
 
-    fetch(`/notes/${id}`, {
+    apiFetch(`/notes/${id}`, {
       method: "DELETE",
       headers: {
         Authorization: `Bearer ${token}`,

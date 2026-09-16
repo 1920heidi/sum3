@@ -3,6 +3,7 @@ import styled from "styled-components";
 import NavBar from "./NavBar";
 import Login from "../pages/Login";
 import NotesPage from "../pages/Notes";
+import { apiFetch } from "../api";
 
 function App() {
   const [user, setUser] = useState(null);
@@ -11,7 +12,7 @@ function App() {
     const token = localStorage.getItem("token");
     if (!token) return;
 
-    fetch("/me", {
+    apiFetch("/me", {
       headers: {
         Authorization: `Bearer ${token}`,
       },

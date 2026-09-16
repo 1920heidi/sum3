@@ -1,6 +1,7 @@
 import os
 
 from flask import Flask, jsonify, request
+from flask_cors import CORS
 from flask_jwt_extended import (
     JWTManager,
     create_access_token,
@@ -15,15 +16,22 @@ from models import Note, User, bcrypt, db
 
 
 app = Flask(__name__)
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
-    "DATABASE_URL", "sqlite:///productivity_app.db"
-)
+
+database_url = os.environ.get("DATABASE_URL", "sqlite:///productivity_app.db")
+if database_url.startswith("postgres://"):
+    database_url = database_url.replace("postgres://", "postgresql://", 1)
+app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["JWT_SECRET_KEY"] = os.environ.get("JWT_SECRET_KEY", "dev-secret-key")
 app.config["JSON_SORT_KEYS"] = False
 
 api = Api(app)
 db.init_app(app)
+
+cors_origins = os.environ.get("CORS_ORIGINS", "*")
+if cors_origins != "*":
+    cors_origins = [origin.strip() for origin in cors_origins.split(",")]
+CORS(app, resources={r"/*": {"origins": cors_origins}})
 
 VALID_CATEGORIES = ["Notes", "Tasks", "Workouts", "Journal"]
 
