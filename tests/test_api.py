@@ -63,10 +63,11 @@ def test_notes_are_user_owned_and_paginated(client):
 
     note_response = client.post(
         "/notes",
-        json={"title": "First note", "content": "Hello"},
+        json={"title": "First note", "content": "Hello", "category": "Tasks"},
         headers={"Authorization": f"Bearer {token_one}"},
     )
     assert note_response.status_code == 201
+    assert note_response.get_json()["category"] == "Tasks"
 
     list_response = client.get(
         "/notes?page=1&per_page=10",
@@ -74,6 +75,14 @@ def test_notes_are_user_owned_and_paginated(client):
     )
     assert list_response.status_code == 200
     assert list_response.get_json()["items"][0]["title"] == "First note"
+    assert list_response.get_json()["items"][0]["category"] == "Tasks"
+
+    filtered_response = client.get(
+        "/notes?category=Tasks",
+        headers={"Authorization": f"Bearer {token_one}"},
+    )
+    assert filtered_response.status_code == 200
+    assert filtered_response.get_json()["items"][0]["category"] == "Tasks"
 
     other_users_notes = client.get(
         "/notes",
